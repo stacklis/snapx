@@ -1,5 +1,6 @@
 package com.snapx.snap
 
+import android.graphics.Bitmap
 import android.graphics.Rect
 import org.junit.Assert.*
 import org.junit.Before
@@ -103,5 +104,22 @@ class SnapEngineTest {
         val zones = engine.computeStaticZones(emptyList())
         val dragRect = Rect(25, 25, 1055, 2375)
         assertNull(engine.findNearestZone(dragRect, zones, 1f))
+    }
+
+    @Test
+    fun `computeEdgeZones returns EDGE zone for bitmap with clear rectangular boundary`() {
+        // White rect on black background — strong edges at the rect border
+        val bmp = Bitmap.createBitmap(200, 400, Bitmap.Config.ARGB_8888)
+        bmp.eraseColor(android.graphics.Color.BLACK)
+        // Draw a white rectangle in the center with a clear boundary
+        for (y in 50 until 350) {
+            for (x in 30 until 170) {
+                bmp.setPixel(x, y, android.graphics.Color.WHITE)
+            }
+        }
+        val zones = engine.computeEdgeZones(bmp)
+        bmp.recycle()
+        assertTrue("Expected at least one EDGE zone from a bitmap with clear rectangular boundary", zones.isNotEmpty())
+        assertTrue("All returned zones should be of type EDGE", zones.all { it.type == ZoneType.EDGE })
     }
 }

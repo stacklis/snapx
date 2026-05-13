@@ -9,8 +9,8 @@ class SnapEngine(
 ) {
     companion object {
         const val SNAP_THRESHOLD_DP = 24f
-        const val EDGE_DETECT_MAX_WIDTH = 400
-        const val MAX_EDGE_ZONES = 5
+        const val EDGE_DETECT_MAX_WIDTH = 400f
+        const val MAX_EDGE_ZONES = 1  // current impl returns bounding rect of all strong edges
     }
 
     fun computeStaticZones(windowBounds: List<Rect>): List<SnapZone> {
@@ -30,7 +30,7 @@ class SnapEngine(
     }
 
     fun computeEdgeZones(bitmap: Bitmap): List<SnapZone> {
-        val scale = minOf(1f, EDGE_DETECT_MAX_WIDTH.toFloat() / bitmap.width)
+        val scale = minOf(1f, EDGE_DETECT_MAX_WIDTH / bitmap.width)
         val scaledW = (bitmap.width * scale).toInt().coerceAtLeast(1)
         val scaledH = (bitmap.height * scale).toInt().coerceAtLeast(1)
         val scaled = Bitmap.createScaledBitmap(bitmap, scaledW, scaledH, false)
@@ -47,7 +47,7 @@ class SnapEngine(
         val threshold = (SNAP_THRESHOLD_DP * densityDp).toInt()
         return zones
             .filter { minEdgeDistance(dragRect, it.rect) < threshold }
-            .minByOrNull { totalEdgeDistance(dragRect, it.rect).toLong() * 1_000_000 - it.priority }
+            .minWithOrNull(compareBy({ totalEdgeDistance(dragRect, it.rect) }, { -it.priority }))
     }
 
     private fun minEdgeDistance(a: Rect, b: Rect): Int = minOf(
