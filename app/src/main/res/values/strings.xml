@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SnapX</string>
+    <string name="accessibility_description">SnapX uses accessibility to read app window boundaries for smart screenshot snapping. No content is read.</string>
+    <string name="notif_channel_name">SnapX</string>
+    <string name="notif_watcher_title">SnapX active</string>
+    <string name="notif_watcher_text">Ready to capture screenshots</string>
+    <string name="notif_saved_title">Screenshot saved</string>
+    <string name="action_view">View</string>
+    <string name="action_share">Share</string>
+</resources>
