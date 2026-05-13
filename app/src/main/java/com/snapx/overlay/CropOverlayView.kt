@@ -25,11 +25,11 @@ class CropOverlayView(context: Context) : View(context) {
     private var lastTouchX = 0f
     private var lastTouchY = 0f
 
-    private val density get() = resources.displayMetrics.density
-    private val cornerRadius get() = 28f * density
-    private val edgeShort    get() = 20f * density
-    private val edgeLong     get() = 40f * density
-    private val touchSlop    get() = 44f * density
+    private var density      = 1f
+    private var cornerRadius = 0f
+    private var edgeShort    = 0f
+    private var edgeLong     = 0f
+    private var touchSlop    = 0f
 
     private val dimPaint = Paint().apply { color = Color.argb(140, 0, 0, 0) }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -98,6 +98,12 @@ class CropOverlayView(context: Context) : View(context) {
     }
 
     @MainThread
+    fun release() {
+        bitmap = null
+        invalidate()
+    }
+
+    @MainThread
     fun confirmCrop() {
         val bmp = bitmap ?: return
         val scaleX = bmp.width.toFloat() / width
@@ -113,6 +119,15 @@ class CropOverlayView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        density      = resources.displayMetrics.density
+        cornerRadius = 28f * density
+        edgeShort    = 20f * density
+        edgeLong     = 40f * density
+        touchSlop    = 44f * density
+        borderPaint.strokeWidth      = 2f * density
+        handleBorderPaint.strokeWidth = 2f * density
+        snapHintPaint.strokeWidth    = 1.5f * density
+        labelPaint.textSize          = 12f * density
         if (bitmap != null && selectionRect.isEmpty) initSelection()
     }
 
@@ -123,6 +138,7 @@ class CropOverlayView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         val bmp = bitmap ?: return
+        if (width == 0 || height == 0) return
 
         canvas.drawBitmap(bmp, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), null)
 
@@ -143,8 +159,8 @@ class CropOverlayView(context: Context) : View(context) {
 
         canvas.drawRect(selectionRect, borderPaint)
 
-        val pw = ((selectionRect.width() / width) * bmp.width).toInt()
-        val ph = ((selectionRect.height() / height) * bmp.height).toInt()
+        val pw = ((selectionRect.width() / width.toFloat()) * bmp.width).toInt()
+        val ph = ((selectionRect.height() / height.toFloat()) * bmp.height).toInt()
         val label = "$pw × $ph"
         val lx = selectionRect.centerX()
         val ly = selectionRect.centerY()

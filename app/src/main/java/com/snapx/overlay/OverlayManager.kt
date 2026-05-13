@@ -82,6 +82,7 @@ class OverlayManager(private val context: Context) {
 
     @MainThread
     fun dismiss() {
+        cropView?.release()
         overlayRoot?.let { windowManager.removeView(it) }
         overlayRoot = null
         cropView = null

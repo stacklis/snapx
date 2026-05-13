@@ -11,6 +11,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.os.IBinder
 import android.provider.MediaStore
@@ -22,9 +23,16 @@ class CropSaveService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    @Suppress("DEPRECATION")
+    private inline fun <reified T : android.os.Parcelable> Intent.getParcelableCompat(key: String): T? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            getParcelableExtra(key, T::class.java)
+        else
+            getParcelableExtra<T>(key)
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val uri = intent?.getParcelableExtra<Uri>(EXTRA_URI) ?: return START_NOT_STICKY
-        val rect = intent.getParcelableExtra<Rect>(EXTRA_RECT) ?: return START_NOT_STICKY
+        val uri  = intent?.getParcelableCompat<Uri>(EXTRA_URI)   ?: return START_NOT_STICKY
+        val rect = intent?.getParcelableCompat<Rect>(EXTRA_RECT) ?: return START_NOT_STICKY
 
         startAsForeground()
 
