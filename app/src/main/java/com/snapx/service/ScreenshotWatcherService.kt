@@ -20,12 +20,15 @@ import com.snapx.R
 import com.snapx.overlay.OverlayManager
 import com.snapx.snap.SnapEngine
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ScreenshotWatcherService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var overlayManager: OverlayManager
     private var contentObserver: ContentObserver? = null
+    private val handleMutex = Mutex()
 
     override fun onCreate() {
         super.onCreate()
@@ -48,43 +51,58 @@ class ScreenshotWatcherService : Service() {
         contentObserver = observer
     }
 
-    private suspend fun handleNewMedia(uri: Uri) {
+    private suspend fun handleNewMedia(uri: Uri) = handleMutex.withLock {
         val projection = arrayOf(
-            MediaStore.Images.Media.DATA,
+            MediaStore.Images.Media.RELATIVE_PATH,
+            MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_ADDED
         )
-        val id = try { ContentUris.parseId(uri) } catch (e: Exception) { return }
+        val id = try { ContentUris.parseId(uri) } catch (e: Exception) { return@withLock }
         val cursor = contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
             "${MediaStore.Images.Media._ID} = ?",
             arrayOf(id.toString()),
             null
-        ) ?: return
+        ) ?: return@withLock
 
-        val path: String
+        val relativePath: String
+        val displayName: String
         val dateAdded: Long
         cursor.use {
-            if (!it.moveToFirst()) return
-            path = it.getString(it.getColumnIndexOrThrow(MediaStore.Images.Media.DATA))
-            dateAdded = it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
+            if (!it.moveToFirst()) return@withLock
+            relativePath = it.getString(it.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)) ?: ""
+            displayName  = it.getString(it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)) ?: ""
+            dateAdded    = it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
         }
 
         val ageSeconds = System.currentTimeMillis() / 1000 - dateAdded
-        if (ageSeconds > 3) return
-        if (!path.contains("screenshot", ignoreCase = true)) return
+        if (ageSeconds > 3) return@withLock
+        val isScreenshot = relativePath.contains("screenshot", ignoreCase = true)
+                        || displayName.contains("screenshot", ignoreCase = true)
+        if (!isScreenshot) return@withLock
 
-        val displayBitmap = loadDisplayBitmap(uri) ?: return
-        val windowBounds = SnapWindowService.instance?.getVisibleWindowBounds() ?: emptyList()
-        val engine = SnapEngine(displayBitmap.width, displayBitmap.height)
-        val staticZones = engine.computeStaticZones(windowBounds)
+        val displayBitmap = loadDisplayBitmap(uri) ?: return@withLock
 
-        withContext(Dispatchers.Main) {
-            if (!overlayManager.isShowing()) {
+        val shown = withContext(Dispatchers.Main) {
+            if (overlayManager.isShowing()) {
+                false
+            } else {
+                val windowBounds = SnapWindowService.instance?.getVisibleWindowBounds() ?: emptyList()
+                val engine = SnapEngine(displayBitmap.width, displayBitmap.height)
+                val staticZones = engine.computeStaticZones(windowBounds)
                 overlayManager.show(displayBitmap, uri, engine, staticZones)
+                true
             }
         }
 
+        if (!shown) {
+            displayBitmap.recycle()
+            return@withLock
+        }
+
+        // Re-create engine for edge detection (SnapEngine is cheap to construct)
+        val engine = SnapEngine(displayBitmap.width, displayBitmap.height)
         val edgeZones = engine.computeEdgeZones(displayBitmap)
         withContext(Dispatchers.Main) {
             overlayManager.updateEdgeZones(edgeZones)
