@@ -7,6 +7,7 @@ import android.net.Uri
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.FrameLayout
+import androidx.annotation.MainThread
 import com.snapx.snap.SnapEngine
 import com.snapx.snap.SnapZone
 
@@ -17,6 +18,7 @@ class OverlayManager(private val context: Context) {
     private var cropView: CropOverlayView? = null
     private var toolbar: SnapToolbar? = null
 
+    @MainThread
     fun show(
         displayBitmap: Bitmap,
         originalUri: Uri,
@@ -72,11 +74,13 @@ class OverlayManager(private val context: Context) {
         toolbar = bar
     }
 
+    @MainThread
     fun updateEdgeZones(zones: List<SnapZone>) {
         cropView?.updateEdgeZones(zones)
         toolbar?.updateEdgeZones(zones)
     }
 
+    @MainThread
     fun dismiss() {
         overlayRoot?.let { windowManager.removeView(it) }
         overlayRoot = null
@@ -84,5 +88,6 @@ class OverlayManager(private val context: Context) {
         toolbar = null
     }
 
+    @MainThread
     fun isShowing() = overlayRoot != null
 }

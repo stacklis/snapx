@@ -26,11 +26,28 @@ class CropSaveService : Service() {
         val uri = intent?.getParcelableExtra<Uri>(EXTRA_URI) ?: return START_NOT_STICKY
         val rect = intent.getParcelableExtra<Rect>(EXTRA_RECT) ?: return START_NOT_STICKY
 
+        startAsForeground()
+
         scope.launch {
             cropAndSave(uri, rect)
             stopSelf(startId)
         }
         return START_NOT_STICKY
+    }
+
+    private fun startAsForeground() {
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val channel = NotificationChannel(CHANNEL_ID, getString(R.string.notif_channel_name),
+            NotificationManager.IMPORTANCE_LOW)
+        nm.createNotificationChannel(channel)
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentTitle(getString(R.string.notif_watcher_title))
+            .setContentText("Saving screenshot…")
+            .build()
+
+        startForeground(NOTIF_CROP_ID, notification)
     }
 
     private suspend fun cropAndSave(originalUri: Uri, rect: Rect) {
@@ -61,14 +78,18 @@ class CropSaveService : Service() {
         val newUri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
             ?: return
 
-        contentResolver.openOutputStream(newUri)?.use { out ->
+        val saved = contentResolver.openOutputStream(newUri)?.use { out ->
             cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
-        }
+        } ?: false
         cropped.recycle()
 
+        if (!saved) {
+            contentResolver.delete(newUri, null, null)
+            return
+        }
         contentResolver.delete(originalUri, null, null)
 
-        withContext(Dispatchers.Main) { postSavedNotification(newUri, displayName) }
+        postSavedNotification(newUri, displayName)
     }
 
     private fun postSavedNotification(uri: Uri, displayName: String) {
@@ -123,6 +144,7 @@ class CropSaveService : Service() {
         const val EXTRA_RECT = "rect"
         const val CHANNEL_ID = "snapx_main"
         const val NOTIF_SAVED_ID = 1002
+        const val NOTIF_CROP_ID = 1003
 
         fun start(context: Context, uri: Uri, rect: Rect) {
             context.startService(
