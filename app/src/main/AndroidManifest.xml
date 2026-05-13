@@ -38,6 +38,7 @@
 
         <service
             android:name=".service.CropSaveService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
         <service
